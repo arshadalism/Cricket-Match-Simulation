@@ -128,7 +128,13 @@ def innings_play(batter_list, bowler_list, overs, target=None):
         current_batsman_strike = batsman_list[i_strike]
         current_batsman_non_strike = batsman_list[i_non_strike]
 
-        current_bowler = bowlers[i]
+        # current_bowler = bowlers[i]
+        if i < len(bowlers):
+            current_bowler = bowlers[i]
+        else:
+            # If not, repeat the bowler_list again
+            bowlers += [Bowler(name) for name in bowler_list]
+            current_bowler = bowlers[i]
 
         current_bowler.bowl_delivery(runs)
         total_ball += 1
