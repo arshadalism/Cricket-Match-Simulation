@@ -1,5 +1,5 @@
 import random
-
+from tabulate import tabulate
 
 class Batsman:
     def __init__(self, name):
@@ -108,6 +108,12 @@ class Bowler(Batsman):
         print("-------------------")
 
 
+def format_deliveries(all_deliveries, team_name):
+    chunks = [all_deliveries[i:i+6] for i in range(0, len(all_deliveries), 6)]
+    formatted_data = [" ".join(map(str, chunk)) + "" for chunk in chunks]
+    return team_name + " : " + " | ".join(formatted_data)
+
+
 def innings_play(batter_list, bowler_list, overs, target=None):
     batsman_list = [Batsman(name) for name in batter_list]
 
@@ -123,6 +129,10 @@ def innings_play(batter_list, bowler_list, overs, target=None):
 
     total_ball = 0
 
+    all_deliveries = []
+
+    batsmen_stats = {batsman.name: {'Runs': 0, 'Balls': 0, '4': 0, '6': 0, 'Strike Rate': 0.0} for batsman in batsman_list}
+
     for _ in range(overs * 6):
         runs = random.choice([1, 2, 3, 4, 6, 'W'])
         current_batsman_strike = batsman_list[i_strike]
@@ -136,7 +146,16 @@ def innings_play(batter_list, bowler_list, overs, target=None):
             bowlers += [Bowler(name) for name in bowler_list]
             current_bowler = bowlers[i]
 
+        if target is not None and team_score >= target:
+            overs_played = total_ball // 6 + total_ball % 6 / 10
+            return team_score, wickets_lost, float(overs_played), all_deliveries
+
+        all_deliveries.append(runs)
+
         current_bowler.bowl_delivery(runs)
+        current_batsman_strike.hit_runs(runs)
+        # all_deliveries.append(runs)
+
         total_ball += 1
         # current_batsman_strike.hit_runs(runs)
 
@@ -148,6 +167,8 @@ def innings_play(batter_list, bowler_list, overs, target=None):
                 wickets_lost += 1
                 print(f"{current_batsman_strike.name} got out.")
                 print(f"runs: {current_batsman_strike.run_scored}, ball_played: {current_batsman_strike.bowl_played}")
+                batsmen_stats[current_batsman_strike.name]['Balls'] += 1
+
                 next_batsman = next((batsman for batsman in batsman_list[next_batsman_index:] if
                                      not batsman.status and batsman != current_batsman_strike and batsman != current_batsman_non_strike),
                                     None)
@@ -164,17 +185,18 @@ def innings_play(batter_list, bowler_list, overs, target=None):
         #     team_score += runs
         # current_batsman_strike.display_batting_stats()
 
-        if target is not None and team_score >= target:
-            overs_played = total_ball // 6 + total_ball % 6 / 10
-            return team_score, wickets_lost, float(overs_played)
-
-        current_bowler.bowl_delivery(runs)
+        # current_bowler.bowl_delivery(runs)
 
         if runs != 'W':
             team_score += runs
+            batsmen_stats[current_batsman_strike.name]['Runs'] += runs
+            batsmen_stats[current_batsman_strike.name]['Balls'] += 1
+            if runs == 4:
+                batsmen_stats[current_batsman_strike.name]['4'] += 1
+            elif runs == 6:
+                batsmen_stats[current_batsman_strike.name]['6'] += 1
 
         print("------Batting Striker--------")
-        current_batsman_strike.hit_runs(runs)
         current_batsman_strike.display_batting_stats()
 
         print("-----Batting Non striker--------")
@@ -194,12 +216,18 @@ def innings_play(batter_list, bowler_list, overs, target=None):
 
         if current_bowler.bowl_bowled % 6 == 0:
             i += 1
-
         print("Done")
         print("------------------------")
 
+    scorecard_headers = ['Name', 'Runs', 'Balls', '4', '6', 'Strike Rate']
+    scorecard_data = [[batsman, stats['Runs'], stats['Balls'], stats['4'], stats['6'], stats['Strike Rate']] for
+                      batsman, stats in batsmen_stats.items()]
+    print("\n--- Batsmen's Scorecard ---")
+    print(tabulate(scorecard_data, headers=scorecard_headers))
+    print("-------------------")
+
     overs_played = total_ball // 6 + total_ball % 6 / 10
-    return team_score, wickets_lost, float(overs_played)
+    return team_score, wickets_lost, float(overs_played), all_deliveries
 
 
 if __name__ == '__main__':
@@ -228,3 +256,24 @@ if __name__ == '__main__':
         print(f"Australia won the match by {10 - second_inning[1]} wickets.")
     else:
         print("It's a tie! score level")
+
+    print(format_deliveries(first_inning[3], "India"))
+    print(format_deliveries(second_inning[3], "Australia"))
+
+
+"""
+India = 0 3 2 6 6 Wk | 0 3 4 3 4 1 | Wd W W W W 2 4 | 2 4 6 2 4 6 
+Aus = 0 3 2 6 6 Wk | 0 3 4 3 4 1 | Wd W W W W 2 4 | 2 4 6 2 4 6 
+
+India - Batting
+Name - Runs - Balls - 4 - 6 Str
+Rohit - 6  - 1 - 0 - 1
+Virat - 6 - 10 - 0 - 0
+
+India Bowling
+Shami - 4 - 1 - 23 - 3
+
+
+India Won by 6 wickets
+
+"""
