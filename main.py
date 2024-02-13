@@ -2,8 +2,9 @@ import random
 from tabulate import tabulate
 from math import ceil
 
+
 class Batsman:
-    def __init__(self, name, trait: None | str, Batting_rating:int, Bowling_rating:int):
+    def __init__(self, name, trait: None | str, Batting_rating: int, Bowling_rating: int):
         self.trait = trait
         self.Batting_rating = Batting_rating
         self.Bowling_rating = Bowling_rating
@@ -179,7 +180,8 @@ def get_current_bowler(bowlers, bowler_list, index):
         current_bowler = bowlers[index]
     else:
         # If the index exceeds the length of bowlers list, repeat the bowler_list again
-        bowlers += [Bowler(name, random.randint(1, 10), random.randint(50, 85), random.randint(20, 50)) for name in bowler_list]
+        bowlers += [Bowler(name, random.randint(1, 10), random.randint(50, 85), random.randint(20, 50)) for name in
+                    bowler_list]
         current_bowler = bowlers[index]
     return current_bowler
 
@@ -252,54 +254,72 @@ probability_each_events = {
 
 
 def equalize_probabilities(probabilities, key_to_increase, percentage_increment):
-    existing_value = probabilities.get(key_to_increase)
-    increment = (existing_value * percentage_increment) // 100
-    probabilities.update({key_to_increase: existing_value + increment})
+    increment = int(round((probabilities[key_to_increase] / 100) * percentage_increment))
+    probabilities[key_to_increase] += increment
+
     all_rest_event = [key for key in probabilities if key != key_to_increase]
     num_events = len(all_rest_event)
-    decrement_per_event = increment // num_events
-    remainder = increment % num_events
+    if num_events > 0:
+        decrement_per_event = increment // num_events
+        remainder = increment % num_events
 
-    for event in all_rest_event:
-        if remainder > 0:
-            new_value = probabilities[event] - (decrement_per_event + 1)
-            remainder -= 1
-        else:
-            new_value = probabilities[event] - decrement_per_event
-        probabilities[event] = new_value
+        for event in all_rest_event:
+            if remainder > 0:
+                new_value = max(0, probabilities[event] - (decrement_per_event + 1))
+                remainder -= 1
+            else:
+                new_value = max(0, probabilities[event] - decrement_per_event)
+            probabilities[event] = new_value
+
+    total_probability = sum(probabilities.values())
+    if total_probability > 100:
+        overage = total_probability - 100
+        for event in probabilities:
+            reduction = int(probabilities[event] * overage / total_probability)
+            probabilities[event] -= reduction
+            total_probability -= reduction
+
+            if total_probability <= 100:
+                break
 
     return probabilities
 
 
-def realistic_function(current_strike_batter, current_bowler, probability_each_events:dict):
-    if current_strike_batter.Batting_rating >= 75 and current_strike_batter.trait == "Opener" or current_strike_batter.trait == "Orthodox":
-        if current_bowler.perfection >= 8 and current_bowler.Bowling_rating >= 75:
-            return equalize_probabilities(probability_each_events, "wicket", 15)
-        elif current_bowler.Bowling_rating >= 75 and current_bowler.perfection < 8:
-            return equalize_probabilities(probability_each_events, "short_run", 15)
-        else:
-            return equalize_probabilities(probability_each_events, "boundaries", 20)
-    elif 60 <= current_strike_batter.Batting_rating < 75 and current_strike_batter.trait == "Orthodox":
-        if 60 >= current_bowler.Bowling_rating < 75:
-            if current_bowler.perfection >= 8:
+def realistic_function(current_strike_batter, current_bowler, probability_each_events: dict):
+    Batting_rating = current_strike_batter.Batting_rating
+    Bowling_rating = current_bowler.Bowling_rating
+    trait = current_strike_batter.trait
+    perfection = current_bowler.perfection
+
+    if Batting_rating >= 75 and trait in ["Opener", "Orthodox"]:
+        if perfection >= 8 and Bowling_rating >= 75:
+            return equalize_probabilities(probability_each_events, "boundaries", 15)
+        elif Bowling_rating >= 75 and 4 <= perfection < 8:
+            return equalize_probabilities(probability_each_events, "short_run", 25)
+
+    elif 60 <= Batting_rating <= 75 and trait == "Orthodox":
+        if 60 <= Bowling_rating <= 75:
+            if perfection >= 8:
                 return equalize_probabilities(probability_each_events, "wicket", 15)
-            elif 4 <= current_bowler.perfection < 8:
+            elif 4 <= perfection < 8:
                 return equalize_probabilities(probability_each_events, "short_run", 15)
-            else:
-                return equalize_probabilities(probability_each_events, "boundaries", 20)
-    elif 45 <= current_strike_batter.Batting_rating < 60 and current_strike_batter.trait == "Finisher":
-        if current_bowler.perfection >= 8:
-            return equalize_probabilities(probability_each_events, "short_run", 15)
-        elif 7 <= current_bowler.perfection >= 4:
+    elif 45 <= Batting_rating <= 60 and trait == "Finisher":
+        if perfection >= 8 and Bowling_rating >= 65:
+            return equalize_probabilities(probability_each_events, "wicket", 15)
+        elif 7 <= perfection >= 4:
             return equalize_probabilities(probability_each_events, "boundaries", 20)
-        else:
-            return equalize_probabilities(probability_each_events, "illegal delivery", 20)
-    elif current_strike_batter.Batting_rating < 45 and current_strike_batter.trait == "Lower Order":
-        if current_bowler.perfection >= 8:
-            return equalize_probabilities(probability_each_events, "wicket", 20)
-        else:
-            return equalize_probabilities(probability_each_events, "short_run", 15)
-    return probability_each_events
+        elif 4 < perfection >= 2:
+            return equalize_probabilities(probability_each_events, "short_run", 20)
+        elif perfection < 2:
+            return equalize_probabilities(probability_each_events, "illegal_delivery", 20)
+    elif Batting_rating < 45 and trait == "Lower Order":
+        if perfection >= 8 and Bowling_rating >= 60:
+            return equalize_probabilities(probability_each_events, "wicket", 25)
+        elif 7 <= perfection >= 4 and Bowling_rating < 60:
+            return equalize_probabilities(probability_each_events, "wicket", 15)
+        elif 4 < perfection >= 2 and Bowling_rating < 60:
+            return equalize_probabilities(probability_each_events, "short_run", 10)
+    return equalize_probabilities(probability_each_events, "short_run", 10)
 
 
 def generate_probability_dict(probability_values: dict):
@@ -336,15 +356,17 @@ def generate_probability_dict(probability_values: dict):
     return result_list
 
 
-def inning_play(batter_list, bowlers_list, overs, target=None):
+def inning_play(batter_list, bowlers_list, overs, probability_each_events: dict = None, target=None):
     i_strike, i_non_strike = 0, 1
     index = 0
     team_score, team_wicket = 0, 0
     current_bowler_index, next_batsman_index = -1, 2
     batsman_list = [
-        Batsman(name=batsman["name"], trait=batsman["trait"], Batting_rating=batsman["Batting_rating"], Bowling_rating=batsman["Bowling_rating"]) for batsman
+        Batsman(name=batsman["name"], trait=batsman["trait"], Batting_rating=batsman["Batting_rating"],
+                Bowling_rating=batsman["Bowling_rating"]) for batsman
         in batter_list]
-    bowlers = [Bowler(name=bowler["name"], perfection=bowler["perfection"], Batting_rating=bowler["Batting_rating"], Bowling_rating=bowler["Bowling_rating"] ) for bowler in
+    bowlers = [Bowler(name=bowler["name"], perfection=bowler["perfection"], Batting_rating=bowler["Batting_rating"],
+                      Bowling_rating=bowler["Bowling_rating"]) for bowler in
                (bowlers_list * int(overs / len(bowlers_list) + 1))[:overs]]
     batsmen_stats = {batsman.name: {'Runs': 0, 'Balls': 0, '4': 0, '6': 0} for batsman in batsman_list}
     bowlers_stats = {bowler.name: {'Balls': 0, 'Runs': 0, 'Wickets': 0} for bowler in bowlers}
@@ -360,16 +382,17 @@ def inning_play(batter_list, bowlers_list, overs, target=None):
         non_striker_Batter = batsman_list[i_non_strike]
         current_bowler = get_current_bowler(bowlers, bowlers_list, index)
 
-        result = realistic_function(striker_Batter, current_bowler, probability_each_events)
-        probability_list = generate_probability_dict(result)
-
-        runs = random.choice(probability_list)
-
         if target and team_score >= target:
             batsmen_scorecard(batsmen_stats, "Australia")
             bowlers_scorecard(bowlers_stats, "India")
             over_played = overs_ball(total_ball)
             return team_score, team_wicket, float(over_played), all_delivery
+
+        current_probabilities = probability_each_events.copy()
+        result = realistic_function(striker_Batter, current_bowler, current_probabilities)
+        probability_list = generate_probability_dict(result)
+
+        runs = random.choice(probability_list)
 
         all_delivery.append(runs)
 
@@ -425,6 +448,13 @@ def inning_play(batter_list, bowlers_list, overs, target=None):
 if __name__ == '__main__':
     overs = 5
 
+    probability_each_events = {
+        "wicket": 10,
+        "boundaries": 30,
+        "short_run": 30,
+        "illegal_delivery": 30
+    }
+
     indian_batter_list = [
         {"name": "Rohit", "trait": "Opener", "Batting_rating": 85, "Bowling_rating": 20},
         {"name": "Jaiswal", "trait": "Opener", "Batting_rating": 75, "Bowling_rating": 15},
@@ -435,8 +465,8 @@ if __name__ == '__main__':
         {"name": "Jaddu", "trait": "Finisher", "Batting_rating": 60, "Bowling_rating": 60},
         {"name": "Axar", "trait": "Finisher", "Batting_rating": 50, "Bowling_rating": 65},
         {"name": "Ashwin", "trait": "Finisher", "Batting_rating": 45, "Bowling_rating": 75},
-        {"name": "Bumrah", "trait": "Lower Order", "Batting_rating": 30, "Bowling_rating": 85},
-        {"name": "Siraj", "trait": "Lower Order", "Batting_rating": 20, "Bowling_rating": 75}
+        {"name": "Bumrah", "trait": "Bowler", "Batting_rating": 30, "Bowling_rating": 85},
+        {"name": "Siraj", "trait": "Bolwer", "Batting_rating": 20, "Bowling_rating": 75}
     ]
 
     australian_bowlers_list = [
@@ -447,7 +477,7 @@ if __name__ == '__main__':
         {"name": "Hazelwood", "perfection": random.randint(1, 10), "Batting_rating": 15, "Bowling_rating": 80}
     ]
 
-    first_inning = inning_play(indian_batter_list, australian_bowlers_list, overs)
+    first_inning = inning_play(indian_batter_list, australian_bowlers_list, overs, probability_each_events, target=None)
     print(f"{first_inning[0]}/{first_inning[1]}, {first_inning[2]}")
     print("------------------------------------------End of innings-----------------------------------------")
     australian_batter_list = [
@@ -471,9 +501,9 @@ if __name__ == '__main__':
         {"name": "Axar", "perfection": random.randint(1, 10), "Batting_rating": 50, "Bowling_rating": 65},
         {"name": "Jaddu", "perfection": random.randint(1, 10), "Batting_rating": 60, "Bowling_rating": 60}
     ]
-    second_inning = inning_play(australian_batter_list, indian_bowlers, overs, (first_inning[0] + 1))
+    second_inning = inning_play(australian_batter_list, indian_bowlers, overs, probability_each_events,
+                                (first_inning[0] + 1))
     print(f"{second_inning[0]}/{second_inning[1]}, {second_inning[2]}")
-
     if first_inning[0] > second_inning[0]:
         print(f"India won the match by {first_inning[0] - second_inning[0]} runs.")
     elif first_inning[0] < second_inning[0]:
