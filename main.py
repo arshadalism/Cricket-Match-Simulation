@@ -265,10 +265,10 @@ def equalize_probabilities(probabilities, key_to_increase, percentage_increment)
 
         for event in all_rest_event:
             if remainder > 0:
-                new_value = max(0, probabilities[event] - (decrement_per_event + 1))
+                new_value = max(1, probabilities[event] - (decrement_per_event + 1))
                 remainder -= 1
             else:
-                new_value = max(0, probabilities[event] - decrement_per_event)
+                new_value = max(1, probabilities[event] - decrement_per_event)
             probabilities[event] = new_value
 
     total_probability = sum(probabilities.values())
@@ -279,7 +279,7 @@ def equalize_probabilities(probabilities, key_to_increase, percentage_increment)
             probabilities[event] -= reduction
             total_probability -= reduction
 
-            if total_probability <= 100:
+            if total_probability <= 99:
                 break
 
     return probabilities
@@ -377,7 +377,6 @@ def inning_play(batter_list, bowlers_list, overs, probability_each_events: dict 
     total_ball = 0
 
     while total_delivery < legal_delivery:
-        # runs = random.choice([1, 2, 3, 'Wkt', 'Wd', 0, 6, 4])
         striker_Batter = batsman_list[i_strike]
         non_striker_Batter = batsman_list[i_non_strike]
         current_bowler = get_current_bowler(bowlers, bowlers_list, index)
@@ -390,10 +389,11 @@ def inning_play(batter_list, bowlers_list, overs, probability_each_events: dict 
 
         current_probabilities = probability_each_events.copy()
         result = realistic_function(striker_Batter, current_bowler, current_probabilities)
+        print("result", result)
         probability_list = generate_probability_dict(result)
+        print("Probability", probability_list)
 
         runs = random.choice(probability_list)
-
         all_delivery.append(runs)
 
         if runs == "Wd":
@@ -504,6 +504,7 @@ if __name__ == '__main__':
     second_inning = inning_play(australian_batter_list, indian_bowlers, overs, probability_each_events,
                                 (first_inning[0] + 1))
     print(f"{second_inning[0]}/{second_inning[1]}, {second_inning[2]}")
+
     if first_inning[0] > second_inning[0]:
         print(f"India won the match by {first_inning[0] - second_inning[0]} runs.")
     elif first_inning[0] < second_inning[0]:
