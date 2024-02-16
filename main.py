@@ -180,7 +180,7 @@ def get_current_bowler(bowlers, bowler_list, index):
         current_bowler = bowlers[index]
     else:
         # If the index exceeds the length of bowlers list, repeat the bowler_list again
-        bowlers += [Bowler(name, random.randint(1, 10), random.randint(50, 85), random.randint(20, 50)) for name in
+        bowlers += [Bowler(name, random.randint(1, 10), random.randint(50, 75), random.randint(20, 50)) for name in
                     bowler_list]
         current_bowler = bowlers[index]
     return current_bowler
@@ -264,18 +264,21 @@ def equalize_probabilities(probabilities, key_to_increase, percentage_increment)
         remainder = increment % num_events
 
         for event in all_rest_event:
-            if remainder > 0:
-                new_value = max(1, probabilities[event] - (decrement_per_event + 1))
+            if probabilities[event] > 1:
+                reduction = min(decrement_per_event, probabilities[event] - 1)
+                probabilities[event] -= reduction
+                remainder -= reduction
+
+        for event in all_rest_event:
+            while remainder > 0 and probabilities[event] > 1:
+                probabilities[event] -= 1
                 remainder -= 1
-            else:
-                new_value = max(1, probabilities[event] - decrement_per_event)
-            probabilities[event] = new_value
 
     total_probability = sum(probabilities.values())
     if total_probability > 100:
         overage = total_probability - 100
         for event in probabilities:
-            reduction = int(probabilities[event] * overage / total_probability)
+            reduction = min(int(probabilities[event] * overage / total_probability), probabilities[event] - 1)
             probabilities[event] -= reduction
             total_probability -= reduction
 
@@ -285,41 +288,241 @@ def equalize_probabilities(probabilities, key_to_increase, percentage_increment)
     return probabilities
 
 
-def realistic_function(current_strike_batter, current_bowler, probability_each_events: dict):
+def first_25_percent(total_ball, total_over):
+    total_balls = total_ball
+    total_over_25 = int(((total_over * 6) * 25) / 100)
+
+    if total_balls <= total_over_25:
+        return True
+    else:
+        return False
+
+
+def last_25_percent(total_ball, total_over):
+    total_balls = total_ball
+    total_over_75 = int(((total_over * 6) * 75) / 100)
+
+    if total_over_75 < total_balls <= total_over * 6:
+        return True
+    else:
+        return False
+
+
+def realistic_function(current_strike_batter, current_bowler, probability_each_events: dict, total_over, over=None):
     Batting_rating = current_strike_batter.Batting_rating
     Bowling_rating = current_bowler.Bowling_rating
     trait = current_strike_batter.trait
     perfection = current_bowler.perfection
+    first_25_overs = first_25_percent(over, total_over)
+    last_25_overs = last_25_percent(over, total_over)
 
-    if Batting_rating >= 75 and trait in ["Opener", "Orthodox"]:
-        if perfection >= 8 and Bowling_rating >= 75:
-            return equalize_probabilities(probability_each_events, "boundaries", 15)
-        elif Bowling_rating >= 75 and 4 <= perfection < 8:
-            return equalize_probabilities(probability_each_events, "short_run", 25)
+    if first_25_overs:
+        print("In this first 25")
+        if Batting_rating >= 70:
+            print("In the batting ration >= 70")
+            if trait in ["Opener", "Orthodox"]:
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 60)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 50)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 15)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 20)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 20)
+            elif trait == "Finisher":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 40)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 30)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 15)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 25)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 30)
 
-    elif 60 <= Batting_rating <= 75 and trait == "Orthodox":
-        if 60 <= Bowling_rating <= 75:
-            if perfection >= 8:
-                return equalize_probabilities(probability_each_events, "wicket", 15)
-            elif 4 <= perfection < 8:
-                return equalize_probabilities(probability_each_events, "short_run", 15)
-    elif 45 <= Batting_rating <= 60 and trait == "Finisher":
-        if perfection >= 8 and Bowling_rating >= 65:
-            return equalize_probabilities(probability_each_events, "wicket", 15)
-        elif 7 <= perfection >= 4:
-            return equalize_probabilities(probability_each_events, "boundaries", 20)
-        elif 4 < perfection >= 2:
-            return equalize_probabilities(probability_each_events, "short_run", 20)
-        elif perfection < 2:
-            return equalize_probabilities(probability_each_events, "illegal_delivery", 20)
-    elif Batting_rating < 45 and trait == "Lower Order":
-        if perfection >= 8 and Bowling_rating >= 60:
-            return equalize_probabilities(probability_each_events, "wicket", 25)
-        elif 7 <= perfection >= 4 and Bowling_rating < 60:
-            return equalize_probabilities(probability_each_events, "wicket", 15)
-        elif 4 < perfection >= 2 and Bowling_rating < 60:
-            return equalize_probabilities(probability_each_events, "short_run", 10)
-    return equalize_probabilities(probability_each_events, "short_run", 10)
+            elif trait == "Lower Order":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 55)
+                elif perfection >= 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 45)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 25)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 10)
+        elif Batting_rating < 70:
+            print("In the batting ration < 70")
+
+            if trait in ["Opener", "Orthodox"]:
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 50)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 30)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 15)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 20)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 20)
+            elif trait == "Finisher":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 40)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 30)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 20)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 25)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 30)
+            elif trait == "Lower Order":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 60)
+                elif perfection >= 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 15)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 25)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 30)
+
+    elif last_25_overs:
+        print("In last 25")
+        if Batting_rating >= 70:
+            if trait in ["Opener", "Orthodox"]:
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 60)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 60)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 15)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 30)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 40)
+            elif trait == "Finisher":
+                if perfection >= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 60)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 60)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 25)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 35)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 50)
+
+            elif trait == "Lower Order":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 65)
+                elif perfection >= 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 45)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 35)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 35)
+        elif Batting_rating < 70:
+            if trait in ["Opener", "Orthodox"]:
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 60)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 35)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 25)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 30)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 25)
+            elif trait == "Finisher":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 60)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 40)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 30)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 35)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 40)
+            elif trait == "Lower Order":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 70)
+                elif perfection >= 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 45)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 35)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 40)
+
+    else:
+        print("Normal")
+        if Batting_rating >= 70:
+            if trait in ["Opener", "Orthodox"]:
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 40)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 30)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 10)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 20)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 10)
+            elif trait == "Finisher":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 30)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 25)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 15)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 25)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 30)
+
+            elif trait == "Lower Order":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 45)
+                elif perfection >= 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 25)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 20)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 25)
+        elif Batting_rating < 70:
+            if trait in ["Opener", "Orthodox"]:
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 40)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 35)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 15)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 25)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 15)
+            elif trait == "Finisher":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 30)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 25)
+                elif perfection > 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 15)
+                elif perfection <= 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "boundaries",35)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "boundaries", 30)
+            elif trait == "Lower Order":
+                if perfection > 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 50)
+                elif perfection >= 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "wicket", 10)
+                elif perfection < 7 and Bowling_rating >= 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 30)
+                elif perfection < 7 and Bowling_rating < 70:
+                    return equalize_probabilities(probability_each_events, "short_run", 30)
+    return probability_each_events
 
 
 def generate_probability_dict(probability_values: dict):
@@ -388,10 +591,8 @@ def inning_play(batter_list, bowlers_list, overs, probability_each_events: dict 
             return team_score, team_wicket, float(over_played), all_delivery
 
         current_probabilities = probability_each_events.copy()
-        result = realistic_function(striker_Batter, current_bowler, current_probabilities)
-        print("result", result)
+        result = realistic_function(striker_Batter, current_bowler, current_probabilities, overs, over=total_delivery)
         probability_list = generate_probability_dict(result)
-        print("Probability", probability_list)
 
         runs = random.choice(probability_list)
         all_delivery.append(runs)
@@ -449,24 +650,24 @@ if __name__ == '__main__':
     overs = 5
 
     probability_each_events = {
-        "wicket": 10,
-        "boundaries": 30,
-        "short_run": 30,
-        "illegal_delivery": 30
+        "wicket": 15,
+        "boundaries": 35,
+        "short_run": 45,
+        "illegal_delivery": 5
     }
 
     indian_batter_list = [
-        {"name": "Rohit", "trait": "Opener", "Batting_rating": 85, "Bowling_rating": 20},
+        {"name": "Rohit", "trait": "Opener", "Batting_rating": 75, "Bowling_rating": 20},
         {"name": "Jaiswal", "trait": "Opener", "Batting_rating": 75, "Bowling_rating": 15},
-        {"name": "Kohli", "trait": "Orthodox", "Batting_rating": 85, "Bowling_rating": 15},
+        {"name": "Kohli", "trait": "Orthodox", "Batting_rating": 75, "Bowling_rating": 15},
         {"name": "Gill", "trait": "Opener", "Batting_rating": 75, "Bowling_rating": 10},
-        {"name": "Rahul", "trait": "Orthodox", "Batting_rating": 80, "Bowling_rating": 0},
+        {"name": "Rahul", "trait": "Orthodox", "Batting_rating": 70, "Bowling_rating": 0},
         {"name": "Bharat", "trait": "Orthodox", "Batting_rating": 65, "Bowling_rating": 0},
         {"name": "Jaddu", "trait": "Finisher", "Batting_rating": 60, "Bowling_rating": 60},
         {"name": "Axar", "trait": "Finisher", "Batting_rating": 50, "Bowling_rating": 65},
-        {"name": "Ashwin", "trait": "Finisher", "Batting_rating": 45, "Bowling_rating": 75},
-        {"name": "Bumrah", "trait": "Bowler", "Batting_rating": 30, "Bowling_rating": 85},
-        {"name": "Siraj", "trait": "Bolwer", "Batting_rating": 20, "Bowling_rating": 75}
+        {"name": "Ashwin", "trait": "Lower Order", "Batting_rating": 45, "Bowling_rating": 75},
+        {"name": "Bumrah", "trait": "Lower Order", "Batting_rating": 30, "Bowling_rating": 75},
+        {"name": "Siraj", "trait": "Lower Order", "Batting_rating": 20, "Bowling_rating": 75}
     ]
 
     australian_bowlers_list = [
@@ -489,7 +690,7 @@ if __name__ == '__main__':
         {"name": "Maxwell", "trait": "Finisher", "Batting_rating": 70, "Bowling_rating": 45},
         {"name": "Inglis", "trait": "Finisher", "Batting_rating": 70, "Bowling_rating": 0},
         {"name": "Cummins", "trait": "Lower Order", "Batting_rating": 30, "Bowling_rating": 85},
-        {"name": "Hazelwood", "trait": "Lower Order", "Batting_rating": 15, "Bowling_rating": 80},
+        {"name": "Hazel wood", "trait": "Lower Order", "Batting_rating": 15, "Bowling_rating": 80},
         {"name": "Starc", "trait": "Lower Order", "Batting_rating": 30, "Bowling_rating": 85},
         {"name": "Zampa", "trait": "Lower Order", "Batting_rating": 15, "Bowling_rating": 80}
     ]
